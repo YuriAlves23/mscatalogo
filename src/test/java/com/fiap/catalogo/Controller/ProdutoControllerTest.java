@@ -1,25 +1,27 @@
 package com.fiap.catalogo.Controller;
 
-import com.fiap.catalogo.dto.ProdutoRequestDTO;
 import com.fiap.catalogo.entity.Produto;
 import com.fiap.catalogo.repository.ProdutoRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
 @ActiveProfiles("test")
-public class ProdutoControllerTest {
+class ProdutoControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -27,46 +29,90 @@ public class ProdutoControllerTest {
     @Autowired
     private ProdutoRepository produtoRepository;
 
+    @BeforeEach
+    void setUp() {
+        produtoRepository.deleteAll();
+    }
+
     @Test
-    void getAll_deveRetornarListaDeProdutos() throws Exception {
-        produtoRepository.save(new Produto(null, "Produto A", "Descrição A", 10.0, 5));
+    void deveListarTodosOsProdutos() throws Exception {
+        produtoRepository.save(new Produto(null, "Produto 1", "Descrição 1", 100.0, 10));
+        produtoRepository.save(new Produto(null, "Produto 2", "Descrição 2", 200.0, 20));
 
         mockMvc.perform(get("/produtos")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray());
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].nome", is("Produto 1")))
+                .andExpect(jsonPath("$.content[0].descricao", is("Descrição 1")))
+                .andExpect(jsonPath("$.content[1].nome", is("Produto 2")))
+                .andExpect(jsonPath("$.content[1].descricao", is("Descrição 2")));
     }
 
     @Test
-    void save_deveCriarProdutoERetornarDTO() throws Exception {
-        ProdutoRequestDTO request = new ProdutoRequestDTO("Produto A", "Descrição A", 10.0, 5);
-
+    void deveSalvarProduto() throws Exception {
         mockMvc.perform(post("/produtos")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                    "nome": "Produto A",
-                                    "descricao": "Descrição A",
-                                    "preco": 10.0,
-                                    "quantidadeEstoque": 5
-                                }
-                                """))
+                    {
+                      "nome": "Produto Teste",
+                      "descricao": "Descrição Teste",
+                      "preco": 300.0,
+                      "quantidadeEstoque": 15
+                    }
+                    """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nome").value("Produto A"));
+                .andExpect(jsonPath("$.nome", is("Produto Teste")))
+                .andExpect(jsonPath("$.descricao", is("Descrição Teste")))
+                .andExpect(jsonPath("$.preco", is(300.0)))
+                .andExpect(jsonPath("$.quantidadeEstoque", is(15)));
     }
 
     @Test
-    void update_comProdutoInexistente_deveRetornarNotFound() throws Exception {
-        mockMvc.perform(put("/produtos/999")
+    void deveAtualizarProduto() throws Exception {
+        Produto produto = produtoRepository.save(new Produto(null, "Produto Atual", "Descrição Atual", 150.0, 5));
+
+        mockMvc.perform(put("/produtos/{id}", produto.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                    "nome": "Produto Atualizado",
-                                    "descricao": "Descrição Atualizada",
-                                    "preco": 20.0,
-                                    "quantidadeEstoque": 10
-                                }
-                                """))
-                .andExpect(status().isNotFound());
+                    {
+                      "nome": "Produto Atualizado",
+                      "descricao": "Descrição Atualizada",
+                      "preco": 180.0,
+                      "quantidadeEstoque": 8
+                    }
+                    """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome", is("Produto Atualizado")))
+                .andExpect(jsonPath("$.descricao", is("Descrição Atualizada")))
+                .andExpect(jsonPath("$.preco", is(180.0)))
+                .andExpect(jsonPath("$.quantidadeEstoque", is(8)));
+    }
+
+    @Test
+    void deveDeletarProduto() throws Exception {
+        Produto produto = produtoRepository.save(new Produto(null, "Produto Deletar", "Descrição Deletar", 100.0, 10));
+
+        mockMvc.perform(delete("/produtos/{id}", produto.getId()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/produtos"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    void deveProcessarArquivo() throws Exception {
+        MockMultipartFile mockFile = new MockMultipartFile(
+                "arquivo",
+                "produtos.csv",
+                "text/csv",
+                "nome,descricao,preco,quantidadeEstoque\nProduto1,Descrição1,100.0,10\nProduto2,Descrição2,200.0,20".getBytes()
+        );
+
+        mockMvc.perform(multipart("/produtos/carga")
+                        .file(mockFile))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Processamento iniciado com sucesso!"));
     }
 }
