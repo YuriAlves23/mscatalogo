@@ -2,6 +2,7 @@ package com.fiap.catalogo.controller;
 
 import com.fiap.catalogo.dto.ProdutoRequestDTO;
 import com.fiap.catalogo.dto.ProdutoResponseDTO;
+import com.fiap.catalogo.entity.Produto;
 import com.fiap.catalogo.service.ProdutoService;
 import jakarta.validation.Valid;
 import org.springframework.batch.core.Job;
@@ -36,6 +37,30 @@ public class ProdutoController {
     @Autowired
     private Job importarProduto;
 
+    @Transactional
+    @GetMapping
+    public ResponseEntity<Page<ProdutoResponseDTO>> getAll(@PageableDefault(size = 10, page = 0) Pageable pageable) {
+        Page<ProdutoResponseDTO> Produtos = produtoService.listarProdutos(pageable);
+
+        return ResponseEntity.ok(Produtos);
+    }
+
+    @Transactional
+    @GetMapping("/{id}")
+    public ResponseEntity<ProdutoResponseDTO> findById(@PathVariable Long id){
+        var produto = produtoService.buscarProduto(id);
+
+        return ResponseEntity.ok(produto);
+    }
+
+    @Transactional
+    @PostMapping
+    public ResponseEntity<ProdutoResponseDTO> save(@Valid @RequestBody ProdutoRequestDTO produtoRequestDTO) {
+        var Produto = produtoService.salvarProduto(produtoRequestDTO);
+
+        return ResponseEntity.ok(Produto);
+    }
+
     @PostMapping("/carga")
     public ResponseEntity<String> carga(@RequestParam("arquivo") MultipartFile arquivo) {
         List<String> errosValidacao = produtoService.validarEstruturaArquivo(arquivo);
@@ -63,25 +88,6 @@ public class ProdutoController {
             return ResponseEntity.status(500).body("Erro ao iniciar o processamento: " + e.getMessage());
         }
     }
-
-
-    @Transactional
-    @GetMapping
-    public ResponseEntity<Page<ProdutoResponseDTO>> getAll(@PageableDefault(size = 10, page = 0) Pageable pageable) {
-        Page<ProdutoResponseDTO> Produtos = produtoService.listarProdutos(pageable);
-
-        return ResponseEntity.ok(Produtos);
-    }
-
-
-    @Transactional
-    @PostMapping
-    public ResponseEntity<ProdutoResponseDTO> save(@Valid @RequestBody ProdutoRequestDTO produtoRequestDTO) {
-        var Produto = produtoService.salvarProduto(produtoRequestDTO);
-
-        return ResponseEntity.ok(Produto);
-    }
-
 
     @Transactional
     @PutMapping("/{id}")

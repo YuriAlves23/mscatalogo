@@ -1,7 +1,10 @@
 package com.fiap.catalogo.Controller;
 
+import com.fiap.catalogo.dto.ProdutoResponseDTO;
 import com.fiap.catalogo.entity.Produto;
+import com.fiap.catalogo.infra.ProdutoException;
 import com.fiap.catalogo.repository.ProdutoRepository;
+import com.fiap.catalogo.service.ProdutoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,10 +14,10 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -28,6 +31,9 @@ class ProdutoControllerTest {
 
     @Autowired
     private ProdutoRepository produtoRepository;
+
+    @Autowired
+    private ProdutoService produtoService;
 
     @BeforeEach
     void setUp() {
@@ -48,6 +54,34 @@ class ProdutoControllerTest {
                 .andExpect(jsonPath("$.content[1].nome", is("Produto 2")))
                 .andExpect(jsonPath("$.content[1].descricao", is("Descrição 2")));
     }
+
+    @Test
+    void deveRetornarProdutoQuandoIdExistir() throws Exception {
+        // Arrange
+        Produto produto = produtoRepository.save(new Produto(null, "Produto Teste", "Descrição Teste", 100.0, 10));
+
+        // Act & Assert
+        mockMvc.perform(get("/produtos/{id}", produto.getId())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(produto.getId()))
+                .andExpect(jsonPath("$.nome").value("Produto Teste"))
+                .andExpect(jsonPath("$.descricao").value("Descrição Teste"))
+                .andExpect(jsonPath("$.preco").value(100.0))
+                .andExpect(jsonPath("$.quantidadeEstoque").value(10));
+    }
+
+    @Test
+    void deveRetornarErroQuandoProdutoNaoExistir() throws Exception {
+        // Arrange
+        Long idProdutoInvalido = 9999L;
+        // Act & Assert
+
+        mockMvc.perform(get("/produtos/{id}", idProdutoInvalido)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+    }
+
 
     @Test
     void deveSalvarProduto() throws Exception {
